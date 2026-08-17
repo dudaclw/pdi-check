@@ -4,7 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDI</title>
+    <title>Progresso Diário | Profissional</title>
+    <script>
+      /* aplica o tema antes da primeira pintura, senão pisca branco ao recarregar no escuro */
+      {
+        const saved = localStorage.getItem('pdi.theme')
+        if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

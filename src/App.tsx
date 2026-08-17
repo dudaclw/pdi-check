@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { GoalCard } from '@/components/GoalCard'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import {
   CATEGORIES,
   STATUSES,
@@ -229,7 +230,9 @@ export default function App() {
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 pb-24 sm:p-6">
       <header className="flex items-center gap-2">
-        <h1 className="mr-auto text-xl font-semibold tracking-tight">PDI</h1>
+        <h1 className="mr-auto text-xl font-semibold tracking-tight">Progresso Diário | Profissional</h1>
+
+        <ThemeToggle />
 
         {/* uma ação primária por tela; o resto (raro) fica aqui dentro */}
         <DropdownMenu>

@@ -1,4 +1,4 @@
-# PDI
+# Progresso Diário | Profissional
 
 Plano de Desenvolvimento Individual, uso pessoal. React + Vite + Tailwind + shadcn/ui.
 Os dados ficam no `localStorage` do navegador (`pdi.v1`) — nada sai da máquina, sem backend e sem login.

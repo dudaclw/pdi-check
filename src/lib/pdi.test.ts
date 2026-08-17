@@ -5,9 +5,12 @@ import {
   closeCycle,
   currentCycle,
   goalProgress,
-  isLate,
+  deadlineState,
   isState,
   matchesFilters,
+  findGoal,
+  relDays,
+  removeGoal,
   statusCounts,
   toCSV,
   today,
@@ -67,10 +70,15 @@ test('RF03 filtros de status e categoria combinam com a busca', () => {
   assert.ok(!matchesFilters(g, { q: 'meta', status: 'Concluída', category: '' }))
 })
 
-test('prazo vencido só marca meta não concluída', () => {
-  assert.ok(isLate(goal({ deadline: '2020-01-01' }), '2026-01-01'))
-  assert.ok(!isLate(goal({ deadline: '2020-01-01', status: 'Concluída' }), '2026-01-01'))
-  assert.ok(!isLate(goal({ deadline: '' }), '2026-01-01'))
+test('urgência do prazo: vencido, a duas semanas, ou tranquilo', () => {
+  const d = (deadline, now, extra = {}) => deadlineState(goal({ deadline, ...extra }), now)
+  assert.equal(d('2026-01-14', '2026-01-15'), 'late', 'ontem já venceu')
+  assert.equal(d('2026-01-15', '2026-01-15'), 'soon', 'vence hoje ainda dá')
+  assert.equal(d('2026-01-29', '2026-01-15'), 'soon', 'exatamente 14 dias')
+  assert.equal(d('2026-01-30', '2026-01-15'), 'ok', '15 dias já é tranquilo')
+  assert.equal(d('', '2026-01-15'), 'ok', 'sem prazo não cobra nada')
+  assert.equal(d('2020-01-01', '2026-01-15', { status: 'Concluída' }), 'ok')
+  assert.equal(d('2020-01-01', '2026-01-15', { status: 'Cancelada' }), 'ok')
 })
 
 test('RF08/RF09 encerrar ciclo preserva histórico e carrega pendências', () => {
@@ -145,4 +153,25 @@ test('importação rejeita JSON que não é um estado do PDI', () => {
   assert.ok(!isState({ foo: 1 }))
   assert.ok(!isState({ cycles: [] }))
   assert.ok(isState({ cycles: [{ id: 'c', name: 'n', start: '', end: null, goals: [] }], currentId: 'c' }))
+})
+
+test('relDays fala em dias, não em timestamp', () => {
+  assert.equal(relDays('2026-08-16', '2026-08-16'), 'hoje')
+  assert.equal(relDays('2026-08-15', '2026-08-16'), 'ontem')
+  assert.equal(relDays('2026-08-13', '2026-08-16'), 'há 3 dias')
+  assert.equal(relDays('2026-03-01', '2026-03-31'), 'há 30 dias')
+})
+
+test('excluir meta funciona em qualquer ciclo, não só no atual', () => {
+  const s: State = {
+    currentId: 'c2',
+    cycles: [
+      { id: 'c2', name: 'atual', start: '', end: null, goals: [goal({ id: 'nova' })] },
+      { id: 'c1', name: 'antigo', start: '', end: '2026-01-01', goals: [goal({ id: 'velha' })] },
+    ],
+  }
+  assert.equal(findGoal(s, 'velha').id, 'velha', 'acha meta de ciclo encerrado')
+  removeGoal(s, 'velha')
+  assert.deepEqual(s.cycles[1].goals, [])
+  assert.equal(s.cycles[0].goals.length, 1, 'não mexe no outro ciclo')
 })

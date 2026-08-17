@@ -127,4 +127,11 @@
   html {
     @apply font-sans;
     }
+  /* faz o date picker, o caret e a scrollbar nativos seguirem o tema */
+  :root {
+    color-scheme: light;
+    }
+  .dark {
+    color-scheme: dark;
+    }
 }

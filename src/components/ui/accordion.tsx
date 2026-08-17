@@ -35,8 +35,9 @@ function AccordionTrigger({
   children,
   ...props
 }: React.ComponentProps<typeof AccordionPrimitive.Trigger>) {
+  // min-w-0: sem isso o header vira max-content e o título longo empurra o resto da linha pra fora
   return (
-    <AccordionPrimitive.Header className="flex flex-1">
+    <AccordionPrimitive.Header className="flex min-w-0 flex-1">
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(

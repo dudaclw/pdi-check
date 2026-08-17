@@ -19,7 +19,9 @@ import {
   findGoal,
   fmtDate,
   goalProgress,
-  isLate,
+  deadlineState,
+  relDays,
+  removeGoal,
   today,
   uid,
 } from '@/lib/pdi'
@@ -40,8 +42,14 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
   const [editing, setEditing] = useState(false)
   const progress = goalProgress(goal)
   const done = goal.actions.filter((a) => a.status === 'Concluída').length
-  const late = isLate(goal)
+  const urgency = deadlineState(goal)
+  const last = goal.checkins[0]
   const color = STATUS_COLOR[goal.status]
+
+  const remove = () => {
+    if (confirm(`Excluir a meta “${goal.title}” e todas as suas ações e check-ins?`))
+      edit((s) => removeGoal(s, goal.id))
+  }
 
   const patch = (p: Partial<Goal>) => edit((s) => void Object.assign(findGoal(s, goal.id), p))
   const patchAction = (id: string, p: Partial<Action>) =>
@@ -79,40 +87,59 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
   }
 
   return (
-    <AccordionItem value={goal.id} className="bg-card rounded-lg border last:border-b">
+    <AccordionItem
+      value={goal.id}
+      className={`rounded-lg border px-3 ${urgency === 'late' ? 'border-destructive/30 bg-destructive/5' : 'bg-card'}`}
+    >
+      {/* card próprio por meta, mas o fechado ocupa uma linha só: 10 metas continuam cabendo na tela */}
       <div className="flex items-center">
-        <AccordionTrigger className="flex-1 gap-3 py-3 pl-4 hover:no-underline">
-          <span className={`mt-1.5 size-2 shrink-0 rounded-full ${color.dot}`} aria-hidden />
-          <span className="mr-auto text-left">
-            <span className="block font-medium">{goal.title}</span>
-            {/* em edição os mesmos dados estão logo abaixo em campos: não repete aqui */}
-            <span className="text-muted-foreground block text-xs" hidden={editing}>
-              {goal.category || 'Sem categoria'}
-              {goal.deadline && (
-                <>
-                  {' · '}
-                  <span className={late ? 'text-destructive font-medium' : ''}>
-                    {late ? 'venceu' : 'até'} {fmtDate(goal.deadline)}
-                  </span>
-                </>
-              )}
-              {goal.actions.length > 0 && ` · ${done}/${goal.actions.length} ações`}
-            </span>
-          </span>
-          {goal.actions.length > 0 && !editing && (
-            <span className="flex shrink-0 items-center gap-2 self-center">
-              <Progress value={progress} className="w-16" />
-              <span className="text-muted-foreground w-8 text-right text-xs tabular-nums">{progress}%</span>
+        <AccordionTrigger className="min-w-0 flex-1 items-center gap-2.5 py-2.5 hover:no-underline">
+          <span className={`size-2 shrink-0 rounded-full ${color.dot}`} aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-left font-medium">{goal.title}</span>
+          {/* em edição os mesmos dados estão logo abaixo em campos: não repete aqui */}
+          {/* grid de colunas fixas: prazo, barra, %, categoria e status alinham entre as linhas.
+              Célula vazia continua ocupando a coluna — é o que mantém o alinhamento. */}
+          {!editing && (
+            <span className="grid shrink-0 grid-cols-[2.5rem_6.5rem] items-center gap-x-3 text-xs sm:grid-cols-[8rem_3rem_2.5rem_6.5rem] md:grid-cols-[8rem_3rem_2.5rem_6rem_6.5rem]">
+              <span
+                className={`hidden text-center whitespace-nowrap sm:block ${
+                  urgency === 'late'
+                    ? 'text-destructive font-medium'
+                    : urgency === 'soon'
+                      ? 'font-medium text-amber-600 dark:text-amber-400'
+                      : 'text-muted-foreground'
+                }`}
+              >
+                {fmtDate(goal.deadline)}
+              </span>
+              <span className="hidden sm:block">
+                {goal.actions.length > 0 && <Progress value={progress} className="w-12" />}
+              </span>
+              <span className="text-muted-foreground text-right tabular-nums">
+                {goal.actions.length > 0 && `${progress}%`}
+              </span>
+              <span className="text-muted-foreground hidden truncate text-center md:block">{goal.category}</span>
+              <Badge className={`${color.badge} justify-self-center`}>{goal.status}</Badge>
             </span>
           )}
-          {!editing && <Badge className={`${color.badge} shrink-0 self-center`}>{goal.status}</Badge>}
         </AccordionTrigger>
-        {!readOnly && (
+        {readOnly ? (
+          /* ciclo encerrado não se edita, mas dá pra apagar o que não deveria estar ali */
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Excluir meta"
+            className="text-muted-foreground hover:text-destructive shrink-0"
+            onClick={remove}
+          >
+            <Trash2 />
+          </Button>
+        ) : (
           <Button
             variant="ghost"
             size="icon"
             aria-label={editing ? 'Concluir edição' : 'Editar meta'}
-            className="text-muted-foreground mr-2 shrink-0"
+            className="text-muted-foreground shrink-0"
             onClick={() => {
               if (!expanded) onExpand()
               setEditing((v) => !v)
@@ -124,7 +151,19 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
       </div>
 
       {/* h-auto: o padrão do shadcn fixa a altura medida na abertura e corta ação/check-in novos */}
-      <AccordionContent className="h-auto space-y-4 px-4 pb-4">
+      <AccordionContent className="h-auto space-y-4 border-t pt-3 pb-4">
+        {!editing && (
+          <p className="text-muted-foreground text-xs">
+            {[
+              `${done}/${goal.actions.length} ações`,
+              goal.category || 'sem categoria',
+              goal.deadline && `prazo ${fmtDate(goal.deadline)}`,
+              last && `último check-in ${relDays(last.date)} · progresso percebido ${last.perceived}%`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        )}
         {editing ? (
           /* RF02 */
           <div className="space-y-3 rounded-md border border-dashed p-3">
@@ -191,13 +230,7 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
               variant="ghost"
               size="sm"
               className="text-muted-foreground hover:text-destructive"
-              onClick={() => {
-                if (confirm(`Excluir a meta “${goal.title}”?`))
-                  edit((s) => {
-                    const c = s.cycles.find((x) => x.id === s.currentId)!
-                    c.goals = c.goals.filter((g) => g.id !== goal.id)
-                  })
-              }}
+              onClick={remove}
             >
               <Trash2 /> Excluir meta
             </Button>

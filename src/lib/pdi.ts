@@ -6,12 +6,12 @@ export const ACTION_TYPES = ['Curso', 'Leitura', 'Prática', 'Mentoria', 'Projet
 /** Lista fixa: categoria digitada à mão vira "Técnica"/"tecnica"/"TECH" e quebra o filtro. */
 export const CATEGORIES = ['Técnica', 'Liderança', 'Comunicação', 'Idiomas', 'Negócio', 'Pessoal']
 
-/** Cor com significado: dá pra escanear a lista sem ler o texto do status. */
+/** Cor com significado, e um tom por status: dá pra escanear a lista sem ler o texto. */
 export const STATUS_COLOR: Record<Status, { dot: string; badge: string; text: string }> = {
   'Não iniciada': {
-    dot: 'bg-muted-foreground/40',
-    badge: 'bg-muted text-muted-foreground border-transparent',
-    text: 'text-muted-foreground',
+    dot: 'bg-slate-400',
+    badge: 'bg-slate-400/15 text-slate-700 dark:text-slate-300 border-transparent',
+    text: 'text-slate-700 dark:text-slate-300',
   },
   'Em andamento': {
     dot: 'bg-blue-500',
@@ -24,14 +24,20 @@ export const STATUS_COLOR: Record<Status, { dot: string; badge: string; text: st
     text: 'text-emerald-700 dark:text-emerald-300',
   },
   Cancelada: {
-    dot: 'bg-muted-foreground/20',
-    badge: 'bg-muted text-muted-foreground border-transparent line-through',
-    text: 'text-muted-foreground',
+    dot: 'bg-rose-500',
+    badge: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-transparent line-through',
+    text: 'text-rose-700 dark:text-rose-300',
   },
 }
 
 /** Uma data, um formato: dd/mm/aaaa em toda a UI, igual ao que o input[type=date] mostra. */
 export const fmtDate = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '')
+
+/** "hoje" / "ontem" / "há 3 dias" — ISO puro, sem fuso: as datas do app são só o dia. */
+export const relDays = (iso: string, now = today()) => {
+  const days = Math.round((Date.parse(now) - Date.parse(iso)) / 864e5)
+  return days <= 0 ? 'hoje' : days === 1 ? 'ontem' : `há ${days} dias`
+}
 
 export type Action = {
   id: string
@@ -101,7 +107,13 @@ export const matchesFilters = (g: Goal, f: Filters) => {
   )
 }
 
-export const isLate = (g: Goal, now = today()) => !!g.deadline && g.deadline < now && g.status !== 'Concluída'
+/** Urgência do prazo: 'late' pinta o card, 'soon' (≤ 14 dias) pinta a data.
+ *  Meta concluída ou cancelada não tem urgência — o prazo dela não cobra mais nada. */
+export const deadlineState = (g: Goal, now = today()): 'late' | 'soon' | 'ok' => {
+  if (!g.deadline || g.status === 'Concluída' || g.status === 'Cancelada') return 'ok'
+  const days = Math.round((Date.parse(g.deadline) - Date.parse(now)) / 864e5)
+  return days < 0 ? 'late' : days <= 14 ? 'soon' : 'ok'
+}
 
 export const categoriesOf = (s: State) =>
   [...new Set(s.cycles.flatMap((c) => c.goals.map((g) => g.category)).filter(Boolean))].sort()
@@ -150,7 +162,12 @@ export function closeCycle(s: State, name: string, carryOver: boolean): State {
 /** O ciclo aberto. Navegar pelo histórico não muda quem é o ciclo atual. */
 export const currentCycle = (s: State) =>
   s.cycles.find((c) => c.id === s.currentId && !c.end) ?? s.cycles.find((c) => !c.end) ?? s.cycles[0]
-export const findGoal = (s: State, id: string) => currentCycle(s).goals.find((g) => g.id === id)!
+/* Por id em qualquer ciclo: o mesmo card serve o ciclo atual e o histórico. */
+export const findGoal = (s: State, id: string) => s.cycles.flatMap((c) => c.goals).find((g) => g.id === id)!
+
+export const removeGoal = (s: State, id: string) => {
+  for (const c of s.cycles) c.goals = c.goals.filter((g) => g.id !== id)
+}
 
 /* ---------- persistência (RNF01: localStorage, 100% local) ---------- */
 
