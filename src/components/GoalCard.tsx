@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { useFarDeadline } from '@/components/FarDeadline'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   ACTION_TYPES,
@@ -40,6 +41,7 @@ type Props = {
 export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
   /* view mode mostra o resumo; o lápis abre os campos. Nunca os dois ao mesmo tempo. */
   const [editing, setEditing] = useState(false)
+  const far = useFarDeadline()
   const progress = goalProgress(goal)
   const done = goal.actions.filter((a) => a.status === 'Concluída').length
   const urgency = deadlineState(goal)
@@ -93,9 +95,29 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
     >
       {/* card próprio por meta, mas o fechado ocupa uma linha só: 10 metas continuam cabendo na tela */}
       <div className="flex items-center">
-        <AccordionTrigger className="min-w-0 flex-1 items-center gap-2.5 py-2.5 hover:no-underline">
-          <span className={`size-2 shrink-0 rounded-full ${color.dot}`} aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-left font-medium">{goal.title}</span>
+        {editing && (
+          <>
+            <span className={`mr-2.5 size-2 shrink-0 rounded-full ${color.dot}`} aria-hidden />
+            {/* o nome se edita onde ele é lido — o painel abaixo cuida do resto */}
+            <Input
+              value={goal.title}
+              aria-label="Nome da meta"
+              className="-ml-1 h-auto min-w-0 flex-1 border-transparent bg-transparent px-1 py-0.5 font-medium shadow-none dark:bg-transparent hover:border-input focus-visible:border-input"
+              onChange={(e) => patch({ title: e.target.value })}
+            />
+          </>
+        )}
+        <AccordionTrigger
+          className={
+            editing ? 'flex-none py-2.5' : 'min-w-0 flex-1 items-center gap-2.5 py-2.5 hover:no-underline'
+          }
+        >
+          {!editing && (
+            <>
+              <span className={`size-2 shrink-0 rounded-full ${color.dot}`} aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-left font-medium">{goal.title}</span>
+            </>
+          )}
           {/* em edição os mesmos dados estão logo abaixo em campos: não repete aqui */}
           {/* grid de colunas fixas: prazo, barra, %, categoria e status alinham entre as linhas.
               Célula vazia continua ocupando a coluna — é o que mantém o alinhamento. */}
@@ -123,6 +145,17 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
             </span>
           )}
         </AccordionTrigger>
+        {editing && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Excluir meta"
+            className="text-muted-foreground hover:text-destructive shrink-0"
+            onClick={remove}
+          >
+            <Trash2 />
+          </Button>
+        )}
         {readOnly ? (
           /* ciclo encerrado não se edita, mas dá pra apagar o que não deveria estar ali */
           <Button
@@ -157,7 +190,6 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
             {[
               `${done}/${goal.actions.length} ações`,
               goal.category || 'sem categoria',
-              goal.deadline && `prazo ${fmtDate(goal.deadline)}`,
               last && `último check-in ${relDays(last.date)} · progresso percebido ${last.perceived}%`,
             ]
               .filter(Boolean)
@@ -167,11 +199,7 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
         {editing ? (
           /* RF02 */
           <div className="space-y-3 rounded-md border border-dashed p-3">
-            <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-              <div className="space-y-1.5">
-                <Label htmlFor={`t-${goal.id}`}>Título</Label>
-                <Input id={`t-${goal.id}`} value={goal.title} onChange={(e) => patch({ title: e.target.value })} />
-              </div>
+            <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor={`c-${goal.id}`}>Categoria</Label>
                 <Select
@@ -191,15 +219,16 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={`d-${goal.id}`}>Prazo</Label>
                 <Input
                   id={`d-${goal.id}`}
                   type="date"
                   value={goal.deadline}
-                  onChange={(e) => patch({ deadline: e.target.value })}
+                  onChange={(e) => {
+                    patch({ deadline: e.target.value })
+                    far.check(e.target.value)
+                  }}
                 />
               </div>
               <div className="space-y-1.5">
@@ -226,14 +255,6 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
                 onChange={(e) => patch({ description: e.target.value })}
               />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={remove}
-            >
-              <Trash2 /> Excluir meta
-            </Button>
           </div>
         ) : (
           goal.description && <p className="text-muted-foreground text-sm">{goal.description}</p>
@@ -304,7 +325,7 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
                   {a.description}
                 </span>
                 <span className="text-muted-foreground text-xs">
-                  {[a.type, a.completedAt && `concluída em ${fmtDate(a.completedAt)}`].filter(Boolean).join(' · ')}
+                  {a.type}
                 </span>
                 {a.notes &&
                   (/^https?:\/\//.test(a.notes) ? (
@@ -392,6 +413,7 @@ export function GoalCard({ goal, readOnly, expanded, onExpand, edit }: Props) {
             />
           )}
         </div>
+        {far.dialog}
       </AccordionContent>
     </AccordionItem>
   )

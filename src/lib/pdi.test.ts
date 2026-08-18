@@ -8,7 +8,9 @@ import {
   deadlineState,
   isState,
   matchesFilters,
+  farYears,
   findGoal,
+  isFarDeadline,
   relDays,
   removeGoal,
   statusCounts,
@@ -174,4 +176,12 @@ test('excluir meta funciona em qualquer ciclo, não só no atual', () => {
   removeGoal(s, 'velha')
   assert.deepEqual(s.cycles[1].goals, [])
   assert.equal(s.cycles[0].goals.length, 1, 'não mexe no outro ciclo')
+})
+
+test('prazo em outro milênio é sinalizado, prazo plausível não', () => {
+  assert.ok(isFarDeadline('12322-03-12', '2026-08-17'), 'ano de 5 dígitos não quebra a conta')
+  assert.ok(isFarDeadline('2035-01-01', '2026-08-17'))
+  assert.ok(!isFarDeadline('2031-01-01', '2026-08-17'), '5 anos ainda é um plano')
+  assert.ok(!isFarDeadline('', '2026-08-17'))
+  assert.equal(farYears('12322-03-12', '2026-08-17'), 10296)
 })

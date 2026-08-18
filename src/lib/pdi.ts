@@ -107,6 +107,11 @@ export const matchesFilters = (g: Goal, f: Filters) => {
   )
 }
 
+/** Prazo em outro milênio costuma ser dedo escorregando no campo de data.
+ *  Compara só o ano: ano com 5 dígitos nem vira Date direito. */
+export const farYears = (iso: string, now = today()) => Number(iso.split('-')[0]) - Number(now.split('-')[0])
+export const isFarDeadline = (iso: string, now = today()) => !!iso && farYears(iso, now) > 5
+
 /** Urgência do prazo: 'late' pinta o card, 'soon' (≤ 14 dias) pinta a data.
  *  Meta concluída ou cancelada não tem urgência — o prazo dela não cobra mais nada. */
 export const deadlineState = (g: Goal, now = today()): 'late' | 'soon' | 'ok' => {

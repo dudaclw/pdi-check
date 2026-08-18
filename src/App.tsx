@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, FileUp, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
+import { Download, FileUp, ListChecks, MoreHorizontal, Plus, RefreshCw, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { GoalCard } from '@/components/GoalCard'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useFarDeadline } from '@/components/FarDeadline'
 import {
   CATEGORIES,
   STATUSES,
@@ -61,6 +62,7 @@ export default function App() {
   const [creating, setCreating] = useState(false)
   const [closing, setClosing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const far = useFarDeadline()
 
   useEffect(() => saveState(state), [state])
 
@@ -74,6 +76,8 @@ export default function App() {
   const cycle = currentCycle(state)
   const closed = state.cycles.filter((c) => c.end)
   const history = closed.find((c) => c.id === historyId) ?? closed[0]
+  const noGoals = cycle.goals.length === 0
+  const firstRun = noGoals && state.cycles.every((c) => !c.goals.length)
 
   function createGoal(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -83,6 +87,7 @@ export default function App() {
     if (!title) return field.focus()
     const f = new FormData(form)
     const category = String(f.get('category') ?? '')
+    const deadline = String(f.get('deadline') ?? '')
     const id = uid()
     edit((s) =>
       currentCycle(s).goals.unshift({
@@ -90,7 +95,7 @@ export default function App() {
         title,
         category: category === NO_CATEGORY ? '' : category,
         description: String(f.get('description') ?? '').trim(),
-        deadline: String(f.get('deadline') ?? ''),
+        deadline,
         status: 'Não iniciada',
         actions: [],
         checkins: [],
@@ -99,6 +104,7 @@ export default function App() {
     setFilters(emptyFilters) /* a meta nova não pode nascer escondida atrás de um filtro */
     setOpen((o) => [...o, id])
     setCreating(false)
+    far.check(deadline) /* depois de fechar o modal: dois diálogos abertos brigam pelo foco */
   }
 
   function confirmClose(e: React.FormEvent<HTMLFormElement>) {
@@ -151,6 +157,43 @@ export default function App() {
       </p>
     )
   }
+
+  /* Ciclo vazio não precisa de resumo zerado nem de filtro: precisa de um caminho pra primeira meta. */
+  const welcome = (
+    <Card>
+      <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+        <span className="bg-muted rounded-full p-3">
+          {firstRun ? <Target className="size-6" /> : <ListChecks className="size-6" />}
+        </span>
+        <div className="space-y-1">
+          <h3 className="text-lg font-medium">{firstRun ? 'Seu PDI começa aqui' : `${cycle.name} ainda está vazio`}</h3>
+          <p className="text-muted-foreground mx-auto max-w-md text-sm">
+            {firstRun
+              ? 'Um plano de desenvolvimento é uma lista curta de metas com prazo. O resto do app existe pra você não precisar lembrar de nada.'
+              : 'Ciclo novo, folha limpa. O que você fez antes continua no Histórico.'}
+          </p>
+        </div>
+        {firstRun && (
+          <ol className="text-muted-foreground mx-auto max-w-md space-y-1.5 text-left text-sm">
+            <li>
+              <b className="text-foreground">1. Crie a meta</b> — título, categoria e prazo.
+            </li>
+            <li>
+              <b className="text-foreground">2. Quebre em ações</b> — marcar uma ação como concluída já move o progresso
+              sozinho.
+            </li>
+            <li>
+              <b className="text-foreground">3. Faça check-ins</b> — uma frase sobre como foi e o quanto você sente que
+              avançou.
+            </li>
+          </ol>
+        )}
+        <Button onClick={() => setCreating(true)}>
+          <Plus /> {firstRun ? 'Criar primeira meta' : 'Criar meta'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
 
   /* RF03 + RF11 */
   const filterBar = (
@@ -268,16 +311,31 @@ export default function App() {
 
         <TabsContent value="atual" className="space-y-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h2 className="text-lg font-medium">{cycle.name}</h2>
-            <span className="text-muted-foreground text-xs">desde {fmtDate(cycle.start)}</span>
+            {/* o nome do ciclo é do usuário: editável no lugar, sem botão de editar no meio */}
+            <Input
+              value={cycle.name}
+              aria-label="Nome do ciclo"
+              className="-ml-1 h-auto w-auto min-w-32 border-transparent bg-transparent px-1 py-0.5 text-lg font-medium shadow-none field-sizing-content md:text-lg dark:bg-transparent hover:border-input focus-visible:border-input"
+              onChange={(e) => edit((s) => void (currentCycle(s).name = e.target.value))}
+              onBlur={(e) =>
+                e.target.value.trim() ||
+                edit((s) => void (currentCycle(s).name = `Ciclo ${new Date().getFullYear()}`))
+              }
+            />
             <Button className="ml-auto" onClick={() => setCreating(true)}>
               <Plus /> Nova meta
             </Button>
           </div>
 
-          {summary(cycle)}
-          {filterBar}
-          {goalList(cycle, false)}
+          {noGoals ? (
+            welcome
+          ) : (
+            <>
+              {summary(cycle)}
+              {filterBar}
+              {goalList(cycle, false)}
+            </>
+          )}
         </TabsContent>
 
         {/* RF09 */}
@@ -384,6 +442,8 @@ export default function App() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {far.dialog}
     </div>
   )
 }
