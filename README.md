@@ -22,4 +22,4 @@ Duas abas: **Ciclo atual** é o dia a dia (padrão ao abrir), **Histórico** é 
 
 ## Se um dia for hospedar (RNF04)
 
-`npm run build` gera arquivos estáticos com todos os dados no navegador — publicar em host público expõe o app, não os dados. Ainda assim, use algo com acesso restrito (Tailscale, Cloudflare Access, Basic Auth) em vez de deixar aberto.
+`npm run build` gera arquivos estáticos com todos os dados no navegador — publicar em host público expõe o app, não os dados. Ainda assim, use algo com acesso restrito (Tailscale, Cloudflare Access, Basic Auth) em vez de deixar aberto..
